@@ -24,7 +24,23 @@ fi
 # --- Dépendances système ---
 echo "[1/5] Installation des dépendances système..."
 sudo apt-get update -q
-sudo apt-get install -y python3 python3-pip python3-venv rsync git chromium-browser exfat-fuse exfat-utils
+
+# Chromium : nom du paquet différent selon la version de l'OS
+if apt-cache show chromium &>/dev/null; then
+  CHROMIUM_PKG="chromium"
+else
+  CHROMIUM_PKG="chromium-browser"
+fi
+
+# exFAT : exfatprogs remplace exfat-utils sur Bookworm/Trixie
+if apt-cache show exfatprogs &>/dev/null; then
+  EXFAT_PKG="exfatprogs"
+else
+  EXFAT_PKG="exfat-utils"
+fi
+
+sudo apt-get install -y python3 python3-pip python3-venv rsync git \
+  "$CHROMIUM_PKG" exfat-fuse "$EXFAT_PKG" ntfs-3g
 
 # --- Environnement virtuel Python ---
 echo "[2/5] Création de l'environnement Python..."
