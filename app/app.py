@@ -3,7 +3,7 @@ import threading
 
 from config import HOST, PORT, APP_NAME, MASTER_VOLUME_NAME
 from disk_utils import get_mounted_disks, get_source_disks, get_master_disk, get_folder_size, format_bytes
-from ingest import STATE, start_ingest
+from ingest import STATE, start_ingest, cancel_ingest
 
 app = Flask(__name__)
 
@@ -49,6 +49,14 @@ def api_start():
     thread.daemon = True
     thread.start()
 
+    return jsonify({"ok": True})
+
+
+@app.route("/api/cancel", methods=["POST"])
+def api_cancel():
+    if not STATE["running"]:
+        return jsonify({"ok": False, "error": "Aucun ingest en cours"}), 409
+    cancel_ingest()
     return jsonify({"ok": True})
 
 

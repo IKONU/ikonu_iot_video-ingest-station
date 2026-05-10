@@ -104,6 +104,7 @@
     .status-complete            { background: #14532d; color: var(--green); }
     .status-complete_with_errors{ background: #7c2d12; color: var(--red); }
     .status-error               { background: #7c2d12; color: var(--red); }
+    .status-cancelled           { background: #2d2d12; color: var(--yellow); }
 
     /* Progression */
     .progress-wrap {
@@ -204,6 +205,7 @@
     .btn:disabled { opacity: 0.35; cursor: not-allowed; }
     .btn-primary  { background: var(--accent); color: #000; }
     .btn-secondary{ background: #333; color: var(--text); }
+    .btn-danger   { background: #7c2d12; color: var(--red); border: 1px solid var(--red); }
     .btn:not(:disabled):hover { opacity: 0.85; }
 
     /* Logs */
@@ -285,7 +287,10 @@
         <span id="statusBadge" class="status-badge status-idle">idle</span>
         <span id="diskLabel" style="margin-left:10px; font-size:13px; color:var(--muted)"></span>
       </div>
-      <div id="durationInfo" style="font-size:13px; color:var(--muted)"></div>
+      <div style="display:flex; gap:8px; align-items:center">
+        <div id="durationInfo" style="font-size:13px; color:var(--muted)"></div>
+        <button class="btn btn-danger" id="cancelBtn" onclick="cancelIngest()" style="display:none; padding:8px 14px; font-size:13px">■ Annuler</button>
+      </div>
     </div>
 
     <!-- Barre globale -->
@@ -444,7 +449,12 @@
         complete: 'Terminé ✓',
         complete_with_errors: 'Terminé avec erreurs',
         error: 'Erreur',
+        cancelled: 'Annulé',
       }[d.status] || d.status;
+
+      // Bouton annuler : visible uniquement pendant l'ingest
+      document.getElementById('cancelBtn').style.display =
+        d.status === 'running' ? 'inline-block' : 'none';
 
       // Label disque
       const diskLabel = document.getElementById('diskLabel');
@@ -500,6 +510,13 @@
       }
 
     } catch (e) {}
+  }
+
+  async function cancelIngest() {
+    if (!confirm('Annuler l\'ingest en cours ?')) return;
+    const res = await fetch('/api/cancel', { method: 'POST' });
+    const data = await res.json();
+    if (!data.ok) alert('Erreur : ' + data.error);
   }
 
   async function startIngest() {

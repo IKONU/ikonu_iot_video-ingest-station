@@ -18,6 +18,7 @@ from checksum import build_checksums, write_checksum_file
 STATE = {
     "status": "idle",
     "running": False,
+    "cancelled": False,
     "current_disk": None,
     "current_disk_index": 0,
     "total_disks": 0,
@@ -36,6 +37,9 @@ STATE = {
     "error": None,
 }
 
+# Référence au process rsync en cours (pour pouvoir l'annuler)
+_current_process = None
+
 # Regex pour parser la ligne de progression rsync --info=progress2
 # Ex:  1,234,567  45%   12.34MB/s    0:00:10
 _PROGRESS_RE = re.compile(
@@ -52,10 +56,19 @@ def log(message):
     print(entry)
 
 
+def cancel_ingest():
+    """Annule l'ingest en cours en tuant le process rsync."""
+    global _current_process
+    if _current_process and _current_process.poll() is None:
+        _current_process.terminate()
+    STATE["cancelled"] = True
+
+
 def reset_state():
     STATE.update({
         "status": "running",
         "running": True,
+        "cancelled": False,
         "current_disk": None,
         "current_disk_index": 0,
         "total_disks": 0,
@@ -84,6 +97,7 @@ def count_files(path):
 
 def rsync_copy_realtime(source_path, dest_path, disk_index, total_disks, global_start):
     """Lance rsync et parse la sortie en temps réel pour mettre à jour STATE."""
+    global _current_process
     os.makedirs(dest_path, exist_ok=True)
 
     cmd = [
@@ -102,10 +116,16 @@ def rsync_copy_realtime(source_path, dest_path, disk_index, total_disks, global_
         text=True,
         bufsize=1,
     )
+    _current_process = process
 
     current_file = None
 
     for line in process.stdout:
+        # Vérifier l'annulation à chaque ligne
+        if STATE["cancelled"]:
+            process.terminate()
+            break
+
         line = line.rstrip()
         if not line:
             continue
@@ -226,6 +246,10 @@ def start_ingest(project_name=None):
         all_checksums = []
 
         for idx, disk in enumerate(sources):
+            # Vérifier l'annulation entre chaque disque
+            if STATE["cancelled"]:
+                log("Ingest annulé par l'utilisateur.")
+                break
             disk_name = disk["name"]
             STATE["current_disk"] = disk_name
             STATE["current_disk_index"] = idx + 1
@@ -278,6 +302,12 @@ def start_ingest(project_name=None):
         STATE["current_file"] = "Écriture des rapports…"
         STATE["speed"] = None
         STATE["eta"] = None
+
+        # Si annulé, on saute les rapports
+        if STATE["cancelled"]:
+            STATE["status"] = "cancelled"
+            log("Ingest annulé — aucun rapport généré.")
+            return
 
         elapsed = round(time.time() - global_start, 2)
         report["finished_at"] = datetime.now().isoformat()
