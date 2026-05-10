@@ -21,8 +21,9 @@ else
   CHROMIUM_BIN="chromium"
 fi
 
+# --app= ouvre sans barre d'adresse ni onglets (mode application)
 exec $CHROMIUM_BIN \
-  --kiosk \
+  --app=http://localhost:8080 \
   --noerrdialogs \
   --disable-infobars \
   --disable-session-crashed-bubble \
@@ -30,4 +31,4 @@ exec $CHROMIUM_BIN \
   --no-first-run \
   --disable-translate \
   --disable-features=TranslateUI \
-  http://localhost:8080
+  --window-size=800,480

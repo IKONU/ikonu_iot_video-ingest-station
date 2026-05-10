@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=IKONU Ingest
+Comment=Station d'ingest vidéo IKONU
+Exec=bash /home/pi/ikonu_iot_video-ingest-station/kiosk/start-kiosk.sh
+Icon=video-display
+Categories=AudioVideo;
+StartupNotify=false

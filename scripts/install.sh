@@ -70,6 +70,12 @@ mkdir -p "$HOME/.config/autostart"
 sed "s|/home/pi/|$HOME/|g" "$APP_DIR/kiosk/ingest-browser.desktop" \
   > "$HOME/.config/autostart/ingest-browser.desktop"
 
+# Icône sur le Bureau
+mkdir -p "$HOME/Desktop"
+sed "s|/home/pi/|$HOME/|g" "$APP_DIR/kiosk/ikonu-ingest.desktop" \
+  > "$HOME/Desktop/ikonu-ingest.desktop"
+chmod +x "$HOME/Desktop/ikonu-ingest.desktop"
+
 # --- Droits de montage USB ---
 echo "[5/5] Configuration des droits de montage..."
 sudo usermod -aG plugdev "$USER" 2>/dev/null || true
