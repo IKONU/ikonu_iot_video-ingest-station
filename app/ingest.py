@@ -1,4 +1,5 @@
 import os
+import re
 import json
 import time
 import subprocess
@@ -18,11 +19,30 @@ STATE = {
     "status": "idle",
     "running": False,
     "current_disk": None,
+    "current_disk_index": 0,
+    "total_disks": 0,
+    "current_file": None,
+    "speed": None,
+    "eta": None,
+    "disk_progress": 0,
+    "total_progress": 0,
+    "bytes_transferred": 0,
+    "bytes_total": 0,
+    "files_done": 0,
+    "files_total": 0,
+    "elapsed_seconds": 0,
     "logs": [],
     "last_report": None,
     "error": None,
-    "progress": 0,
 }
+
+# Regex pour parser la ligne de progression rsync --info=progress2
+# Ex:  1,234,567  45%   12.34MB/s    0:00:10
+_PROGRESS_RE = re.compile(
+    r"([\d,]+)\s+(\d+)%\s+([\d.]+\s*\S+/s)\s+([\d:]+|\-\-:--:--)"
+)
+# Regex pour détecter le nom de fichier courant dans la sortie rsync
+_FILE_RE = re.compile(r"^(?!\s)(.+\.(mp4|mov|mxf|r3d|braw|ari|mts|mpeg|avi|dng|jpg|jpeg|png|wav|aiff|aif|mp3))\s*$", re.IGNORECASE)
 
 
 def log(message):
@@ -33,32 +53,98 @@ def log(message):
 
 
 def reset_state():
-    STATE["status"] = "running"
-    STATE["running"] = True
-    STATE["current_disk"] = None
-    STATE["logs"] = []
-    STATE["last_report"] = None
-    STATE["error"] = None
-    STATE["progress"] = 0
+    STATE.update({
+        "status": "running",
+        "running": True,
+        "current_disk": None,
+        "current_disk_index": 0,
+        "total_disks": 0,
+        "current_file": None,
+        "speed": None,
+        "eta": None,
+        "disk_progress": 0,
+        "total_progress": 0,
+        "bytes_transferred": 0,
+        "bytes_total": 0,
+        "files_done": 0,
+        "files_total": 0,
+        "elapsed_seconds": 0,
+        "logs": [],
+        "last_report": None,
+        "error": None,
+    })
 
 
-def rsync_copy(source_path, dest_path):
-    """Copie via rsync avec vérification de checksum."""
+def count_files(path):
+    count = 0
+    for _, _, files in os.walk(path):
+        count += len(files)
+    return count
+
+
+def rsync_copy_realtime(source_path, dest_path, disk_index, total_disks, global_start):
+    """Lance rsync et parse la sortie en temps réel pour mettre à jour STATE."""
     os.makedirs(dest_path, exist_ok=True)
+
     cmd = [
         "rsync",
         "-avh",
-        "--checksum",
-        "--progress",
+        "--info=progress2",
+        "--no-inc-recursive",
         f"{source_path}/",
         f"{dest_path}/",
     ]
-    result = subprocess.run(cmd, capture_output=True, text=True)
-    return result.returncode == 0, result.stdout, result.stderr
+
+    process = subprocess.Popen(
+        cmd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        bufsize=1,
+    )
+
+    current_file = None
+
+    for line in process.stdout:
+        line = line.rstrip()
+        if not line:
+            continue
+
+        # Ligne de progression rsync
+        m = _PROGRESS_RE.search(line)
+        if m:
+            pct = int(m.group(2))
+            speed = m.group(3).replace(" ", "")
+            eta = m.group(4)
+
+            STATE["disk_progress"] = pct
+            STATE["speed"] = speed
+            STATE["eta"] = eta if eta != "--:--:--" else None
+            STATE["elapsed_seconds"] = round(time.time() - global_start)
+
+            # Progression globale : disques terminés + progression du disque en cours
+            base = (disk_index / total_disks) * 100
+            STATE["total_progress"] = round(base + (pct / total_disks))
+            continue
+
+        # Ligne de nom de fichier (pas une ligne de stats)
+        m2 = _FILE_RE.match(line)
+        if m2:
+            current_file = os.path.basename(m2.group(1))
+            STATE["current_file"] = current_file
+            STATE["files_done"] += 1
+            continue
+
+        # Lignes ordinaires → log uniquement si intéressantes
+        if line.startswith("sending") or line.startswith("created") or "error" in line.lower():
+            log(f"  {line}")
+
+    process.wait()
+    STATE["disk_progress"] = 100
+    return process.returncode == 0
 
 
 def verify_copy(source_path, dest_path):
-    """Vérifie que tous les fichiers source sont présents dans la destination."""
     missing = []
     mismatch = []
 
@@ -70,9 +156,7 @@ def verify_copy(source_path, dest_path):
 
             if not os.path.exists(dst_file):
                 missing.append(rel)
-                continue
-
-            if os.path.getsize(src_file) != os.path.getsize(dst_file):
+            elif os.path.getsize(src_file) != os.path.getsize(dst_file):
                 mismatch.append(rel)
 
     return missing, mismatch
@@ -80,17 +164,16 @@ def verify_copy(source_path, dest_path):
 
 def start_ingest(project_name=None):
     reset_state()
-    start_time = time.time()
+    global_start = time.time()
 
     try:
         sources = get_source_disks()
         master = get_master_disk()
 
         if not master:
-            raise RuntimeError("Disque MASTER introuvable. Brancher et nommer le SSD MASTER.")
-
+            raise RuntimeError("Disque MASTER introuvable.")
         if not sources:
-            raise RuntimeError("Aucun disque source détecté. Brancher au moins un SSD caméra.")
+            raise RuntimeError("Aucun disque source détecté.")
 
         required_space = sum(get_folder_size(disk["path"]) for disk in sources)
 
@@ -118,6 +201,16 @@ def start_ingest(project_name=None):
         ]:
             os.makedirs(folder, exist_ok=True)
 
+        # Compter les fichiers totaux
+        total_files = sum(count_files(d["path"]) for d in sources)
+        STATE["files_total"] = total_files
+        STATE["total_disks"] = len(sources)
+        STATE["bytes_total"] = required_space
+
+        log(f"Projet : {project_name}")
+        log(f"Sources : {len(sources)} disque(s) — {format_bytes(required_space)} au total")
+        log(f"Fichiers : {total_files}")
+
         report = {
             "project_name": project_name,
             "started_at": datetime.now().isoformat(),
@@ -131,33 +224,40 @@ def start_ingest(project_name=None):
         }
 
         all_checksums = []
-        total_disks = len(sources)
 
         for idx, disk in enumerate(sources):
             disk_name = disk["name"]
             STATE["current_disk"] = disk_name
-            STATE["progress"] = int((idx / total_disks) * 100)
+            STATE["current_disk_index"] = idx + 1
+            STATE["current_file"] = None
+            STATE["disk_progress"] = 0
+            STATE["files_done"] = 0
 
-            log(f"Copie de {disk_name} ({format_bytes(get_folder_size(disk['path']))})")
+            disk_size = get_folder_size(disk["path"])
+            log(f"[{idx+1}/{len(sources)}] {disk_name} — {format_bytes(disk_size)}")
 
             destination = os.path.join(rushes_root, disk_name)
 
-            success, stdout, stderr = rsync_copy(disk["path"], destination)
+            success = rsync_copy_realtime(
+                disk["path"], destination, idx, len(sources), global_start
+            )
 
             if not success:
-                log(f"  ERREUR rsync pour {disk_name}: {stderr.strip()}")
+                log(f"  Erreur rsync sur {disk_name}")
 
             missing, mismatch = verify_copy(disk["path"], destination)
             disk_success = success and not missing and not mismatch
 
             log(f"  Calcul checksums {disk_name}…")
+            STATE["current_file"] = f"Calcul checksums {disk_name}…"
             destination_checksums = build_checksums(destination)
 
             report["sources"].append({
                 "name": disk_name,
                 "source_path": disk["path"],
                 "destination_path": destination,
-                "size_bytes": get_folder_size(disk["path"]),
+                "size_bytes": disk_size,
+                "size_human": format_bytes(disk_size),
                 "success": disk_success,
                 "missing_files": missing,
                 "checksum_mismatch": mismatch,
@@ -174,11 +274,15 @@ def start_ingest(project_name=None):
             else:
                 log(f"  ERREUR : {disk_name}")
 
-        STATE["progress"] = 95
+        STATE["total_progress"] = 98
+        STATE["current_file"] = "Écriture des rapports…"
+        STATE["speed"] = None
+        STATE["eta"] = None
 
+        elapsed = round(time.time() - global_start, 2)
         report["finished_at"] = datetime.now().isoformat()
-        report["duration_seconds"] = round(time.time() - start_time, 2)
-        report["success"] = all(source["success"] for source in report["sources"])
+        report["duration_seconds"] = elapsed
+        report["success"] = all(s["success"] for s in report["sources"])
 
         json_report_path = os.path.join(reports_root, "ingest_report.json")
         txt_report_path = os.path.join(reports_root, "ingest_report.txt")
@@ -188,23 +292,24 @@ def start_ingest(project_name=None):
             json.dump(report, f, indent=2, ensure_ascii=False)
 
         with open(txt_report_path, "w", encoding="utf-8") as f:
-            f.write(f"Projet: {project_name}\n")
-            f.write(f"Succès: {report['success']}\n")
-            f.write(f"Durée: {report['duration_seconds']} secondes\n")
-            f.write(f"Espace copié: {report['required_space_human']}\n\n")
+            f.write(f"Projet : {project_name}\n")
+            f.write(f"Succès : {report['success']}\n")
+            f.write(f"Durée  : {_fmt_duration(elapsed)}\n")
+            f.write(f"Volume : {format_bytes(required_space)}\n\n")
             for source in report["sources"]:
-                f.write(f"{source['name']}: {'OK' if source['success'] else 'ERROR'}\n")
+                f.write(f"{source['name']} : {'OK' if source['success'] else 'ERREUR'}\n")
                 if source["missing_files"]:
-                    f.write(f"  Fichiers manquants: {source['missing_files']}\n")
+                    f.write(f"  Manquants : {source['missing_files']}\n")
                 if source["checksum_mismatch"]:
-                    f.write(f"  Checksums incorrects: {source['checksum_mismatch']}\n")
+                    f.write(f"  Checksums incorrects : {source['checksum_mismatch']}\n")
 
         write_checksum_file(all_checksums, checksums_path)
 
         STATE["last_report"] = report
-        STATE["progress"] = 100
+        STATE["total_progress"] = 100
+        STATE["current_file"] = None
         STATE["status"] = "complete" if report["success"] else "complete_with_errors"
-        log("Ingest terminé.")
+        log(f"Ingest terminé en {_fmt_duration(elapsed)}.")
 
     except Exception as e:
         STATE["error"] = str(e)
@@ -214,3 +319,16 @@ def start_ingest(project_name=None):
     finally:
         STATE["running"] = False
         STATE["current_disk"] = None
+        STATE["elapsed_seconds"] = round(time.time() - global_start)
+
+
+def _fmt_duration(seconds):
+    seconds = int(seconds)
+    h = seconds // 3600
+    m = (seconds % 3600) // 60
+    s = seconds % 60
+    if h > 0:
+        return f"{h}h {m:02d}m {s:02d}s"
+    if m > 0:
+        return f"{m}m {s:02d}s"
+    return f"{s}s"
