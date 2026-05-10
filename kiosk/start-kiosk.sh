@@ -22,6 +22,8 @@ else
 fi
 
 # --app= ouvre sans barre d'adresse ni onglets (mode application)
+# --window-position=0,30 : décale la fenêtre sous la barre de menu (hauteur ~30px)
+# La fenêtre reste redimensionnable et la barre de menu reste accessible
 exec $CHROMIUM_BIN \
   --app=http://localhost:8080 \
   --noerrdialogs \
@@ -31,4 +33,5 @@ exec $CHROMIUM_BIN \
   --no-first-run \
   --disable-translate \
   --disable-features=TranslateUI \
-  --window-size=800,480
+  --window-size=800,450 \
+  --window-position=0,30
