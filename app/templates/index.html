@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{{ app_name }}</title>
+  <style>
+    :root {
+      --bg: #0d0d0d;
+      --surface: #1a1a1a;
+      --border: #2e2e2e;
+      --accent: #e8a020;
+      --green: #22c55e;
+      --red: #ef4444;
+      --yellow: #eab308;
+      --text: #e8e8e8;
+      --muted: #888;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
+      font-size: 15px;
+      min-height: 100vh;
+    }
+
+    header {
+      background: var(--surface);
+      border-bottom: 2px solid var(--accent);
+      padding: 14px 20px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    header .logo {
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      color: var(--accent);
+    }
+
+    header .subtitle {
+      font-size: 12px;
+      color: var(--muted);
+      letter-spacing: 0.5px;
+    }
+
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 20px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 18px 20px;
+    }
+
+    .card-title {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--muted);
+      margin-bottom: 14px;
+    }
+
+    /* Disques */
+    .disk-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: 10px;
+    }
+
+    .disk-item {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+    }
+
+    .disk-item.master {
+      border-color: var(--accent);
+    }
+
+    .disk-name {
+      font-weight: 700;
+      font-size: 14px;
+      margin-bottom: 6px;
+    }
+
+    .disk-name.master { color: var(--accent); }
+    .disk-name.source { color: #60a5fa; }
+
+    .disk-bar-bg {
+      background: #333;
+      border-radius: 4px;
+      height: 5px;
+      margin: 6px 0;
+    }
+
+    .disk-bar {
+      background: var(--accent);
+      border-radius: 4px;
+      height: 5px;
+      transition: width 0.4s ease;
+    }
+
+    .disk-meta {
+      font-size: 11px;
+      color: var(--muted);
+    }
+
+    /* Statut */
+    .status-badge {
+      display: inline-block;
+      padding: 3px 10px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .status-idle { background: #333; color: var(--muted); }
+    .status-running { background: #1e3a5f; color: #60a5fa; }
+    .status-complete { background: #14532d; color: var(--green); }
+    .status-complete_with_errors { background: #7c2d12; color: var(--red); }
+    .status-error { background: #7c2d12; color: var(--red); }
+
+    /* Barre de progression */
+    .progress-wrap {
+      background: #333;
+      border-radius: 6px;
+      height: 10px;
+      overflow: hidden;
+      margin-top: 10px;
+    }
+
+    .progress-bar {
+      background: var(--accent);
+      height: 10px;
+      border-radius: 6px;
+      transition: width 0.5s ease;
+    }
+
+    /* Formulaire */
+    .form-row {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    input[type="text"] {
+      flex: 1;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      padding: 10px 14px;
+      font-size: 14px;
+      outline: none;
+      min-width: 200px;
+    }
+
+    input[type="text"]:focus {
+      border-color: var(--accent);
+    }
+
+    .btn {
+      padding: 10px 20px;
+      border-radius: 6px;
+      border: none;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.2s;
+    }
+
+    .btn:disabled {
+      opacity: 0.35;
+      cursor: not-allowed;
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      color: #000;
+    }
+
+    .btn-secondary {
+      background: #333;
+      color: var(--text);
+    }
+
+    .btn:not(:disabled):hover { opacity: 0.85; }
+
+    /* Logs */
+    #logs {
+      background: #0a0a0a;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 12px;
+      font-family: 'Courier New', monospace;
+      font-size: 12px;
+      color: #aaa;
+      max-height: 220px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      line-height: 1.6;
+    }
+
+    /* Alerte espace */
+    .alert {
+      padding: 10px 14px;
+      border-radius: 6px;
+      font-size: 13px;
+      margin-top: 8px;
+    }
+
+    .alert-ok { background: #14532d33; border: 1px solid #22c55e44; color: var(--green); }
+    .alert-warn { background: #7c2d1233; border: 1px solid #ef444444; color: var(--red); }
+
+    .info-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 13px;
+      padding: 5px 0;
+      border-bottom: 1px solid var(--border);
+      color: var(--muted);
+    }
+
+    .info-row:last-child { border-bottom: none; }
+    .info-row span { color: var(--text); font-weight: 500; }
+
+    .no-disk {
+      color: var(--muted);
+      font-style: italic;
+      font-size: 13px;
+      text-align: center;
+      padding: 20px 0;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div>
+    <div class="logo">IKONU</div>
+    <div class="subtitle">Video Ingest Station</div>
+  </div>
+</header>
+
+<div class="container">
+
+  <!-- Disques détectés -->
+  <div class="card">
+    <div class="card-title">Disques détectés</div>
+    <div id="diskGrid" class="disk-grid"><p class="no-disk">Détection en cours…</p></div>
+    <div id="spaceAlert"></div>
+  </div>
+
+  <!-- Résumé espace -->
+  <div class="card" id="summaryCard" style="display:none">
+    <div class="card-title">Résumé</div>
+    <div id="summaryRows"></div>
+  </div>
+
+  <!-- Lancer l'ingest -->
+  <div class="card">
+    <div class="card-title">Lancer l'ingest</div>
+    <div class="form-row">
+      <input type="text" id="projectName" placeholder="Ex : 2026-08-08 - NOM_DU_TOURNAGE" />
+      <button class="btn btn-primary" id="startBtn" onclick="startIngest()" disabled>▶ START INGEST</button>
+      <button class="btn btn-secondary" onclick="resetState()">↺ Réinitialiser</button>
+    </div>
+  </div>
+
+  <!-- Statut -->
+  <div class="card">
+    <div class="card-title">Statut</div>
+    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px">
+      <div>
+        <span id="statusBadge" class="status-badge status-idle">idle</span>
+        <span id="currentDisk" style="margin-left:12px; font-size:13px; color:var(--muted)"></span>
+      </div>
+      <div id="durationInfo" style="font-size:12px; color:var(--muted)"></div>
+    </div>
+    <div class="progress-wrap" style="margin-top:12px">
+      <div class="progress-bar" id="progressBar" style="width:0%"></div>
+    </div>
+    <div id="errorMsg" style="margin-top:10px; font-size:13px; color:var(--red)"></div>
+  </div>
+
+  <!-- Logs -->
+  <div class="card">
+    <div class="card-title">Journal</div>
+    <pre id="logs">En attente…</pre>
+  </div>
+
+</div>
+
+<script>
+  let lastStatus = 'idle';
+
+  function fmtBytes(b) {
+    if (b === null || b === undefined) return '—';
+    const units = ['B','KB','MB','GB','TB'];
+    let i = 0;
+    while (b >= 1024 && i < units.length - 1) { b /= 1024; i++; }
+    return b.toFixed(2) + ' ' + units[i];
+  }
+
+  function usedPct(disk) {
+    return disk.total > 0 ? Math.round(disk.used / disk.total * 100) : 0;
+  }
+
+  async function refreshDisks() {
+    try {
+      const res = await fetch('/api/disks');
+      const data = await res.json();
+
+      let html = '';
+
+      if (data.master) {
+        const pct = usedPct(data.master);
+        html += `
+          <div class="disk-item master">
+            <div class="disk-name master">MASTER</div>
+            <div class="disk-bar-bg"><div class="disk-bar" style="width:${pct}%"></div></div>
+            <div class="disk-meta">Libre : ${fmtBytes(data.master.free)}</div>
+            <div class="disk-meta">Total : ${fmtBytes(data.master.total)}</div>
+          </div>`;
+      } else {
+        html += `<div class="no-disk">MASTER introuvable — renommer le SSD destination en MASTER</div>`;
+      }
+
+      if (data.sources.length === 0) {
+        html += `<div class="no-disk">Aucun disque source — brancher les SSD caméra</div>`;
+      } else {
+        data.sources.forEach(d => {
+          const pct = usedPct(d);
+          html += `
+            <div class="disk-item">
+              <div class="disk-name source">${d.name}</div>
+              <div class="disk-bar-bg"><div class="disk-bar" style="width:${pct}%; background:#60a5fa"></div></div>
+              <div class="disk-meta">Utilisé : ${fmtBytes(d.used)}</div>
+              <div class="disk-meta">Total : ${fmtBytes(d.total)}</div>
+            </div>`;
+        });
+      }
+
+      document.getElementById('diskGrid').innerHTML = html;
+
+      // Résumé
+      const sum = document.getElementById('summaryCard');
+      const rows = document.getElementById('summaryRows');
+      if (data.sources.length > 0 || data.master) {
+        sum.style.display = '';
+        rows.innerHTML = `
+          <div class="info-row">Sources détectées <span>${data.sources.length}</span></div>
+          <div class="info-row">Espace requis <span>${data.required_space_human}</span></div>
+          <div class="info-row">Libre sur MASTER <span>${data.master ? fmtBytes(data.master.free) : '—'}</span></div>
+        `;
+      } else {
+        sum.style.display = 'none';
+      }
+
+      // Alerte espace
+      const alert = document.getElementById('spaceAlert');
+      if (data.sources.length > 0 && data.master) {
+        if (data.can_start) {
+          alert.innerHTML = `<div class="alert alert-ok">✓ Espace suffisant sur MASTER</div>`;
+        } else {
+          alert.innerHTML = `<div class="alert alert-warn">✗ Espace insuffisant sur MASTER (requis : ${data.required_space_human})</div>`;
+        }
+      } else {
+        alert.innerHTML = '';
+      }
+
+      document.getElementById('startBtn').disabled = !data.can_start;
+
+    } catch (e) {
+      document.getElementById('diskGrid').innerHTML = `<p class="no-disk" style="color:var(--red)">Erreur de communication avec le serveur</p>`;
+    }
+  }
+
+  async function refreshState() {
+    try {
+      const res = await fetch('/api/state');
+      const data = await res.json();
+
+      const badge = document.getElementById('statusBadge');
+      badge.className = `status-badge status-${data.status}`;
+      badge.textContent = data.status;
+
+      document.getElementById('currentDisk').textContent =
+        data.current_disk ? `Disque en cours : ${data.current_disk}` : '';
+
+      document.getElementById('progressBar').style.width = (data.progress || 0) + '%';
+
+      document.getElementById('errorMsg').textContent =
+        data.error ? '⚠ ' + data.error : '';
+
+      if (data.logs && data.logs.length > 0) {
+        const logsEl = document.getElementById('logs');
+        logsEl.textContent = data.logs.join('\n');
+        logsEl.scrollTop = logsEl.scrollHeight;
+      }
+
+      if (data.last_report) {
+        document.getElementById('durationInfo').textContent =
+          `Durée : ${data.last_report.duration_seconds}s`;
+      }
+
+      lastStatus = data.status;
+    } catch (e) {}
+  }
+
+  async function startIngest() {
+    const projectName = document.getElementById('projectName').value.trim();
+    const res = await fetch('/api/start', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ project_name: projectName || null })
+    });
+    const data = await res.json();
+    if (!data.ok) {
+      alert('Erreur : ' + data.error);
+    }
+  }
+
+  async function resetState() {
+    await fetch('/api/reset', { method: 'POST' });
+    document.getElementById('progressBar').style.width = '0%';
+    document.getElementById('logs').textContent = 'En attente…';
+    document.getElementById('durationInfo').textContent = '';
+    document.getElementById('errorMsg').textContent = '';
+  }
+
+  setInterval(refreshDisks, 4000);
+  setInterval(refreshState, 1500);
+  refreshDisks();
+  refreshState();
+</script>
+
+</body>
+</html>

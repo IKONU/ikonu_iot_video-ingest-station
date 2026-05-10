@@ -1,0 +1,17 @@
+[Unit]
+Description=IKONU IoT Video Ingest Station
+After=network.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/ikonu_iot_video-ingest-station/app
+ExecStart=/home/pi/ikonu_iot_video-ingest-station/venv/bin/python /home/pi/ikonu_iot_video-ingest-station/app/app.py
+Restart=always
+RestartSec=5
+Environment=INGEST_MOUNT_BASE=/media/pi
+Environment=INGEST_MASTER_NAME=MASTER
+Environment=INGEST_PORT=8080
+
+[Install]
+WantedBy=multi-user.target

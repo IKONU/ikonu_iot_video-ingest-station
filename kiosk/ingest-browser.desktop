@@ -1,0 +1,4 @@
+[Desktop Entry]
+Type=Application
+Name=IKONU Ingest Browser
+Exec=chromium-browser --kiosk --noerrdialogs --disable-infobars --disable-session-crashed-bubble --disable-restore-session-state http://localhost:8080
