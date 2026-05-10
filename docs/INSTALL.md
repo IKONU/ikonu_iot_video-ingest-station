@@ -96,6 +96,8 @@ Pour que les SSD en **exFAT** (caméras) et **NTFS** soient bien montés :
 sudo apt install -y exfat-fuse exfatprogs ntfs-3g
 ```
 
+> **Note Trixie/Bookworm :** Sur les versions récentes de Raspberry Pi OS, `exfat-utils` est remplacé par `exfatprogs` et `chromium-browser` par `chromium`. Le script `install.sh` détecte automatiquement la bonne version.
+
 ### 2.4 — Vérifier la détection des disques USB
 
 Brancher un SSD et vérifier qu'il apparaît :
@@ -125,11 +127,14 @@ cd ~/ikonu_iot_video-ingest-station
 
 > Remplacer `TON-USER` par ton nom d'utilisateur GitHub.
 
-### 3.2 — Lancer l'installation automatique
+### 3.2 — Corriger les fins de ligne et lancer l'installation
+
+> **Important :** Les fichiers ont été créés sur Windows. Il faut corriger les fins de ligne avant de lancer le script, sinon bash affiche `command not found`.
 
 ```bash
+sed -i 's/\r//' scripts/install.sh scripts/update.sh scripts/uninstall.sh
 chmod +x scripts/*.sh
-./scripts/install.sh
+bash scripts/install.sh
 ```
 
 Le script installe automatiquement :
@@ -273,10 +278,10 @@ df -h
 [ 5 ] Cloner le projet
         git clone https://github.com/TON-USER/ikonu_iot_video-ingest-station.git ~/ikonu_iot_video-ingest-station
 
-[ 6 ] Installer
+[ 6 ] Corriger les fins de ligne et installer
         cd ~/ikonu_iot_video-ingest-station
-        chmod +x scripts/*.sh
-        ./scripts/install.sh
+        sed -i 's/\r//' scripts/install.sh scripts/update.sh scripts/uninstall.sh
+        bash scripts/install.sh
 
 [ 7 ] Redémarrer
         sudo reboot
