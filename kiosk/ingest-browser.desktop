@@ -1,4 +1,5 @@
 [Desktop Entry]
 Type=Application
 Name=IKONU Ingest Browser
-Exec=chromium-browser --kiosk --noerrdialogs --disable-infobars --disable-session-crashed-bubble --disable-restore-session-state http://localhost:8080
+Exec=bash /home/pi/ikonu_iot_video-ingest-station/kiosk/start-kiosk.sh
+X-GNOME-Autostart-enabled=true

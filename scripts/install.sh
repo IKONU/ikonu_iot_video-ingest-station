@@ -60,8 +60,15 @@ sudo systemctl restart $SERVICE_NAME
 
 # --- Mode kiosk (démarrage automatique de Chromium) ---
 echo "[4/5] Configuration du mode kiosk..."
+
+# Corriger les fins de ligne du script kiosk
+sed -i 's/\r//' "$APP_DIR/kiosk/start-kiosk.sh"
+chmod +x "$APP_DIR/kiosk/start-kiosk.sh"
+
+# Adapter le .desktop au bon utilisateur (remplacer /home/pi par le home réel)
 mkdir -p "$HOME/.config/autostart"
-cp "$APP_DIR/kiosk/ingest-browser.desktop" "$HOME/.config/autostart/ingest-browser.desktop"
+sed "s|/home/pi/|$HOME/|g" "$APP_DIR/kiosk/ingest-browser.desktop" \
+  > "$HOME/.config/autostart/ingest-browser.desktop"
 
 # --- Droits de montage USB ---
 echo "[5/5] Configuration des droits de montage..."
